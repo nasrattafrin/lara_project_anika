@@ -4,9 +4,10 @@ namespace App\Models;
 
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
-use Spatie\Permission\Traits\HasRoles; 
+use Spatie\Permission\Traits\HasRoles;
 
 class User extends Authenticatable
 {
@@ -16,12 +17,12 @@ class User extends Authenticatable
     /**
      * Role constants
      */
-    public const ROLE_PLATFORM_ADMIN     = 'platform_admin';
-    public const ROLE_PRESS_RESPONSIBLE  = 'press_responsible';
-    public const ROLE_UNIT_MANAGER       = 'unit_manager';
-    public const ROLE_ACCOUNTANT         = 'accountant';
-    public const ROLE_OPERATOR           = 'operator';
-    public const ROLE_CUSTOMER           = 'customer';
+    public const ROLE_PLATFORM_ADMIN    = 'platform_admin';
+    public const ROLE_PRESS_RESPONSIBLE = 'press_responsible';
+    public const ROLE_UNIT_MANAGER      = 'unit_manager';
+    public const ROLE_ACCOUNTANT        = 'accountant';
+    public const ROLE_OPERATOR          = 'operator';
+    public const ROLE_CUSTOMER          = 'customer';
 
     /**
      * Status constants
@@ -70,17 +71,22 @@ class User extends Authenticatable
     // ------------------------------------------------------------------
     // Relationships
     // ------------------------------------------------------------------
-  
-    
-    // public function tenant(): \Illuminate\Database\Eloquent\Relations\BelongsTo
-    // {
-    //     return $this->belongsTo(\App\Models\Tenant::class);
-    // }
-    //
-    // public function unit(): \Illuminate\Database\Eloquent\Relations\BelongsTo
-    // {
-    //     return $this->belongsTo(\App\Models\Unit::class);
-    // }
+
+    /**
+     * User er tenant (printing press)
+     */
+    public function tenant(): BelongsTo
+    {
+        return $this->belongsTo(Tenant::class);
+    }
+
+    /**
+     * User er unit (unit_manager / operator der jonno)
+     */
+    public function unit(): BelongsTo
+    {
+        return $this->belongsTo(Unit::class);
+    }
 
     // ------------------------------------------------------------------
     // Role helpers
