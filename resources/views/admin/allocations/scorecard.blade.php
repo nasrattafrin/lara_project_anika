@@ -4,9 +4,7 @@
 
 @push('styles')
 <style>
-    /* ══════════════════════════════════════════════════════
-       PREMIUM SCORECARD STYLES
-    ══════════════════════════════════════════════════════ */
+    /*  PREMIUM SCORECARD STYLES  */
     .scorecard-wrapper {
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         padding: 30px;
@@ -321,7 +319,7 @@
 
         {{-- Error Message --}}
         @if(session('error'))
-            <div class="alert alert-danger">❌ {{ session('error') }}</div>
+            <div class="alert alert-danger"> {{ session('error') }}</div>
         @endif
 
         {{-- Top 3 Units Grid --}}
@@ -506,9 +504,9 @@
         $colors = ['#26B99A', '#3498DB', '#F39C12'];
     @endphp
 
-    // ══════════════════════════════════════════════════════
+   
     // CIRCULAR GAUGE WITH ANIMATION — labels added
-    // ══════════════════════════════════════════════════════
+    
     @foreach($topUnits as $index => $alloc)
     (function() {
         var canvas = document.getElementById('gauge-{{ $alloc->id }}');
@@ -548,9 +546,9 @@
     })();
     @endforeach
 
-    // ══════════════════════════════════════════════════════
+    
     // COUNT-UP ANIMATION
-    // ══════════════════════════════════════════════════════
+    
     document.querySelectorAll('.gauge-score').forEach(function(el) {
         var target = parseFloat(el.getAttribute('data-score'));
         var current = 0;
