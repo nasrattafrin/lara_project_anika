@@ -71,6 +71,53 @@
                 <div class="count green">{{ $onTimeRate ?? 0 }}%</div>
                 <span class="count_bottom">Last 30 days</span>
             </div>
+        @endrole 
+            
+        {{-- PENDING ORDERS FOR PRESS RESPONSIBLE --}}
+        @role('press_responsible')
+            @if(isset($pendingOrders) && $pendingOrders->count() > 0)
+                <div class="row">
+                    <div class="col-md-12">
+                        <div class="x_panel">
+                            <div class="x_title">
+                                <h2>Pending Orders <small>Allocation needed</small></h2>
+                                <div class="clearfix"></div>
+                            </div>
+                            <div class="x_content">
+                                <table class="table table-striped">
+                                    <thead>
+                                        <tr>
+                                            <th>Order #</th>
+                                            <th>Deadline</th>
+                                            <th>Status</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach($pendingOrders as $order)
+                                            <tr>
+                                                <td><strong>{{ $order->order_number }}</strong></td>
+                                                <td>
+                                                    {{ $order->deadline?->format('d M Y') ?? '—' }}
+                                                    @if($order->deadline && $order->deadline->isPast())
+                                                        <span class="label label-danger">Overdue</span>
+                                                    @endif
+                                                </td>
+                                                <td><span class="label label-warning">{{ ucfirst($order->status) }}</span></td>
+                                                <td>
+                                                    <a href="{{ route('allocations.scorecard', $order) }}" class="btn btn-primary btn-sm">
+                                                        <i class="fa fa-calculator"></i> View Scorecard
+                                                    </a>
+                                                </td>
+                                            </tr>
+                                        @endforeach
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            @endif
         @endrole
 
         {{-- UNIT MANAGER --}}

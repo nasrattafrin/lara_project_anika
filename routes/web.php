@@ -10,6 +10,8 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\Admin\SubscriptionController;
 use App\Http\Controllers\Admin\InvoiceController;
 use App\Http\Controllers\Admin\PaymentController;
+use App\Http\Controllers\Admin\AllocationController;
+use App\Http\Controllers\Admin\OrderController;
 
 
 Route::get('/dashboard', [DashboardController::class, 'index'])
@@ -45,11 +47,18 @@ Route::middleware(['auth'])->prefix('admin')->group(function () {
 
 
 });
- // Press Responsible / Unit Manager
-Route::middleware(['auth'])->prefix('press-responsible')->group(function () {
-        Route::resource('units', UnitController::class);
- });
-Route::middleware(['auth'])->prefix('unit_manager')->group(function () {
-Route::get('/my-unit', [UnitController::class, 'myUnit'])->name('unit.my-unit');
+ // Press Responsible
+Route::middleware(['auth'])->prefix('press_responsible')->group(function () {
+    Route::resource('units', UnitController::class);
+    Route::resource('orders', OrderController::class); 
+
+    // Allocation
+    Route::get('orders/{order}/scorecard', [AllocationController::class, 'scorecard'])->name('allocations.scorecard');
+    Route::post('orders/{order}/approve', [AllocationController::class, 'approve'])->name('allocations.approve');
+    Route::get('allocations/{allocation}', [AllocationController::class, 'show'])->name('allocations.show');
 });
 
+// Unit Manager
+Route::middleware(['auth'])->prefix('unit_manager')->group(function ()  {
+    Route::get('/my-unit', [UnitController::class, 'myUnit'])->name('unit.my-unit');
+});

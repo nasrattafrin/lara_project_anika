@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Order;
 use App\Models\Plan;
 use App\Models\Tenant;
 use App\Models\Unit;
@@ -35,16 +36,32 @@ class DashboardController extends Controller
         ]);
     }
 
-    private function pressDashboard($user, $tenant)
-    {
-        return view('dashboard.index', [
-            'tenant' => $tenant,
-            'totalUnits' => $tenant ? Unit::where('tenant_id', $tenant->id)->count() : 0,
-            'activeOrders' => 0,
-            'runningJobs' => 0,
-            'onTimeRate' => 0,
-        ]);
+   private function pressDashboard($user, $tenant)
+{
+    if (!$tenant) {
+        return view('dashboard.index', ['error' => 'No tenant assigned']);
     }
+
+    // Pending orders — jekhane allocation hoy nai
+    $pendingOrders = \App\Models\Order::where('tenant_id', $tenant->id)
+        ->whereIn('status', ['confirmed', 'quoted'])
+        ->whereDoesntHave('allocations', function ($q) {
+            $q->where('status', 'approved');
+        })
+        ->latest()
+        ->take(5)
+        ->get();
+
+    return view('dashboard.index', [
+        'tenant' => $tenant,
+        'totalUnits' => Unit::where('tenant_id', $tenant->id)->count(),
+        'activeOrders' => Order::where('tenant_id', $tenant->id)
+            ->whereIn('status', ['confirmed', 'allocated', 'in_production'])->count(),
+        'runningJobs' => 0,
+        'onTimeRate' => 0,
+        'pendingOrders' => $pendingOrders,   // ← new
+    ]);
+}
 
     private function unitManagerDashboard($user, $tenant)
     {
