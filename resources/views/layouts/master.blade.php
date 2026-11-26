@@ -103,25 +103,28 @@
 
                   
                   @role('press_responsible')
-                  <li>
+                    <li>
                       <a href="{{ route('units.index') }}">
                           <i class="fa fa-building"></i> Units
                       </a>
-                  </li>
+                    </li>
+                    <li>
+                      <a href="{{ route('machines.index') }}">
+                          <i class="fa fa-cogs"></i> Machines
+                      </a>
+                    </li>
                     <li>
                       <a><i class="fa fa-shopping-cart"></i> Orders <span class="fa fa-chevron-down"></span></a>
                       <ul class="nav child_menu">
-                        <li><a href="#">All Orders</a></li>
-                        <li><a href="#">Pending</a></li>
-                        <li><a href="#">In Production</a></li>
+                        <li><a href="{{ route('orders.index') }}">All Orders</a></li>
+                        <li><a href="{{ route('orders.create') }}">New Order</a></li>
                       </ul>
                     </li>
                     <li>
                       <a><i class="fa fa-cogs"></i> Production <span class="fa fa-chevron-down"></span></a>
                       <ul class="nav child_menu">
-                        <li><a href="#">Jobs</a></li>
+                        <li><a href="{{ route('jobs.index') }}">Jobs</a></li>
                         <li><a href="#">Transfers</a></li>
-                        <li><a href="#">Stages</a></li>
                       </ul>
                     </li>
                     <li>
@@ -140,7 +143,7 @@
                         </a>
                     </li>
                     <li>
-                      <a href="#"><i class="fa fa-tasks"></i> Assigned Jobs</a>
+                      <a href="{{ route('jobs.index') }}"><i class="fa fa-tasks"></i> Assigned Jobs</a>
                     </li>
                     <li>
                       <a href="#"><i class="fa fa-exchange"></i> Transfer Requests</a>
@@ -184,7 +187,7 @@
                   
                   @role('operator')
                     <li>
-                      <a href="#"><i class="fa fa-tasks"></i> My Jobs</a>
+                      <a href="{{ route('jobs.index') }}"><i class="fa fa-tasks"></i> My Jobs</a>
                     </li>
                     <li>
                       <a href="#"><i class="fa fa-qrcode"></i> Scan QR</a>

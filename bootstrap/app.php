@@ -10,10 +10,9 @@ return Application::configure(basePath: dirname(__DIR__))
         commands: __DIR__.'/../routes/console.php',
         health: '/up',
     )
-    ->withMiddleware(function (Middleware $middleware) {
-        // Spatie Permission middleware alias
+       ->withMiddleware(function (Middleware $middleware) {
         $middleware->alias([
-            'role' => \Spatie\Permission\Middleware\RoleMiddleware::class,
+            'role' => \App\Http\Middleware\CheckRole::class,
             'permission' => \Spatie\Permission\Middleware\PermissionMiddleware::class,
             'role_or_permission' => \Spatie\Permission\Middleware\RoleOrPermissionMiddleware::class,
         ]);

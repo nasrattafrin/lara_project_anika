@@ -18,6 +18,16 @@
                             <label>Product <span class="text-danger">*</span></label>
                             <input type="text" name="product_name" class="form-control" value="{{ old('product_name') }}" required>
                         </div>
+                            <div class="form-group">
+                            <label>Printing type 
+                                <span class="text-danger">*</span>
+                            </label>
+                            <select name="process_type" class="form-control" required>
+                                @foreach(\App\Models\Machine::TYPES as $key => $label)
+                                    <option value="{{ $key }}" @selected(old('process_type') == $key)>{{ $label }}</option>
+                                @endforeach
+                            </select>
+                        </div>
                         <div class="form-group">
                             <label>Quantity <span class="text-danger">*</span></label>
                             <input type="number" name="quantity" class="form-control" value="{{ old('quantity', 1000) }}" min="1" required>

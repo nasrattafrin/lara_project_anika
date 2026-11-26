@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Allocation;
 use App\Models\AllocationScore;
+use App\Models\Machine;
 use App\Models\Order;
 use App\Models\ProductionJob;
 use App\Models\Unit;
@@ -14,37 +15,106 @@ class AllocationService
      * Weight configuration (documentation Section 08)
      */
     private const WEIGHTS = [
-        'on_time' => 30,
+        'on_time'  => 30,
         'workload' => 25,
-        'cost' => 20,
-        'history' => 15,
-        'quality' => 10,
+        'cost'     => 20,
+        'history'  => 15,
+        'quality'  => 10,
     ];
 
+    
+    private array $ineligible = [];
+
+    public function ineligibleUnits(): array
+    {
+        return $this->ineligible;
+    }
+
     /**
-     * Order er jonno sob unit er score calculate kore
-     * Returns: allocations sorted by score (highest first)
+     * Calculate scores for eligible units for a given order
      */
     public function calculateScores(Order $order): array
     {
-        $tenant = $order->tenant;
-        $units = Unit::where('tenant_id', $tenant->id)
-            ->where('status', 'active')
-            ->get();
+        $this->ineligible = [];
+        $order->loadMissing('items');
+
+        $quantity = max(1, (int) $order->items->sum('quantity'));
+        $requiredTypes = $order->items->pluck('process_type')->filter()->unique()->values()->all();
 
         // Purano suggested allocation delete
         Allocation::where('order_id', $order->id)->where('status', 'suggested')->delete();
 
-        $results = [];
+        $units = Unit::where('tenant_id', $order->tenant_id)
+            ->where('status', 'active')
+            ->with(['machines' => fn ($q) => $q->where('status', 'active')])
+            ->get();
+
+        // ---------- Pass 1: eligibility + raw numbers ----------
+        $candidates = [];
 
         foreach ($units as $unit) {
-            $onTime = $this->onTimeScore($unit, $order);
-            $workload = $this->workloadScore($unit);
-            $cost = $this->costScore($unit, $order);
-            $history = $this->historyScore($unit);
-            $quality = $this->qualityScore($unit);
+            $machines = $unit->machines;
 
-            // Weighted total
+            if ($machines->isEmpty()) {
+                $this->ineligible[] = "{$unit->name}: no active machine";
+                continue;
+            }
+
+            
+            $missing = collect($requiredTypes)
+                ->filter(fn ($t) => $machines->where('process_type', $t)->isEmpty());
+
+            if ($missing->isNotEmpty()) {
+                $labels = $missing->map(fn ($t) => Machine::TYPES[$t] ?? $t)->implode(', ');
+                $this->ineligible[] = "{$unit->name}: {$labels} missing required machine";
+                continue;
+            }
+
+            $matching = empty($requiredTypes)
+                ? $machines
+                : $machines->whereIn('process_type', $requiredTypes);
+
+            $dailyCapacity = (int) $matching->sum('capacity_per_day');
+
+            if ($dailyCapacity <= 0) {
+                $this->ineligible[] = "{$unit->name}:  zero daily capacity";
+                continue;
+            }
+
+           
+            $backlog = (int) ProductionJob::where('unit_id', $unit->id)
+                ->whereIn('status', ['queued', 'printing'])
+                ->sum('quantity');
+
+          
+            $costPerPiece = (float) $matching->min('cost_per_unit');
+
+            $candidates[] = [
+                'unit'     => $unit,
+                'capacity' => $dailyCapacity,
+                'backlog'  => $backlog,
+                'cost'     => $costPerPiece * $quantity,
+            ];
+        }
+
+        if (empty($candidates)) {
+            return []; 
+        }
+
+        $minCost = collect($candidates)->min('cost');
+
+        // ---------- Pass 2: scoring ----------
+        $results = [];
+
+        foreach ($candidates as $c) {
+            $unit = $c['unit'];
+
+            $onTime   = $this->onTimeScore($order, $quantity, $c['capacity'], $c['backlog']);
+            $workload = $this->workloadScore($c['capacity'], $c['backlog']);
+            $cost     = $this->costScore($c['cost'], $minCost);
+            $history  = $this->historyScore($unit);
+            $quality  = $this->qualityScore($unit);
+
             $total = (
                 ($onTime * self::WEIGHTS['on_time']) +
                 ($workload * self::WEIGHTS['workload']) +
@@ -55,105 +125,80 @@ class AllocationService
 
             $allocation = Allocation::create([
                 'order_id' => $order->id,
-                'unit_id' => $unit->id,
-                'status' => 'suggested',
-                'score' => round($total, 2),
+                'unit_id'  => $unit->id,
+                'status'   => 'suggested',
+                'score'    => round($total, 2),
             ]);
 
             $breakdown = [
-                'on_time' => $onTime,
+                'on_time'  => $onTime,
                 'workload' => $workload,
-                'cost' => $cost,
-                'history' => $history,
-                'quality' => $quality,
+                'cost'     => $cost,
+                'history'  => $history,
+                'quality'  => $quality,
             ];
 
             foreach ($breakdown as $factor => $raw) {
                 AllocationScore::create([
-                    'allocation_id' => $allocation->id,
-                    'factor' => $factor,
-                    'weight' => self::WEIGHTS[$factor],
-                    'raw_score' => round($raw, 2),
+                    'allocation_id'  => $allocation->id,
+                    'factor'         => $factor,
+                    'weight'         => self::WEIGHTS[$factor],
+                    'raw_score'      => round($raw, 2),
                     'weighted_score' => round($raw * self::WEIGHTS[$factor] / 100, 2),
                 ]);
             }
 
+            $allocation->load(['unit', 'scores']);
             $results[] = $allocation;
         }
 
-        // Sort by score descending
-        usort($results, fn($a, $b) => $b->score <=> $a->score);
+        usort($results, fn ($a, $b) => $b->score <=> $a->score);
 
         return $results;
     }
 
-    /**
-     * On-time score (weight 30)
-     */
-    private function onTimeScore(Unit $unit, Order $order): float
+    private function onTimeScore(Order $order, int $quantity, int $capacity, int $backlog): float
     {
         if (!$order->deadline) {
             return 100;
         }
 
-        $daysAvailable = now()->diffInDays($order->deadline, false);
+        $daysAvailable = (int) now()->startOfDay()
+            ->diffInDays($order->deadline->copy()->startOfDay(), false);
+
         if ($daysAvailable <= 0) {
             return 0;
         }
 
-        $unitJobs = ProductionJob::where('unit_id', $unit->id)
-            ->whereIn('status', ['queued', 'printing'])
-            ->count();
-
-        $queueDays = $unitJobs * 2;
-        $daysNeeded = $queueDays + 2;
+        $daysNeeded = max(1, (int) ceil(($backlog + $quantity) / $capacity));
 
         if ($daysNeeded > $daysAvailable) {
             return max(0, 100 - (($daysNeeded - $daysAvailable) * 20));
         }
 
-        return min(100, ($daysAvailable - $daysNeeded) * 10 + 50);
+        return min(100, 50 + (($daysAvailable - $daysNeeded) * 10));
     }
 
-    /**
-     * Workload score (weight 25)
-     */
-    private function workloadScore(Unit $unit): float
+    
+    private function workloadScore(int $capacity, int $backlog): float
     {
-        $activeJobs = ProductionJob::where('unit_id', $unit->id)
-            ->whereIn('status', ['queued', 'printing', 'qc'])
-            ->count();
+        $weeklyCapacity = $capacity * 7;
+        $utilization = min(1, $backlog / $weeklyCapacity);
 
-        $maxCapacity = 5;
-        $utilization = $activeJobs / $maxCapacity;
-
-        return max(0, (1 - $utilization) * 100);
+        return (1 - $utilization) * 100;
     }
 
-    /**
-     * Cost score (weight 20)
-     */
-    private function costScore(Unit $unit, Order $order): float
+    
+    private function costScore(float $unitCost, float $minCost): float
     {
-        $unitCost = $this->estimateUnitCost($unit, $order);
-
-        $allUnits = Unit::where('tenant_id', $unit->tenant_id)->get();
-        $minCost = $allUnits->map(fn($u) => $this->estimateUnitCost($u, $order))->min();
-
-        if ($unitCost == 0) return 100;
-        if ($minCost == 0) return 100;
+        if ($unitCost <= 0 || $minCost <= 0) {
+            return 100;
+        }
 
         return min(100, ($minCost / $unitCost) * 100);
     }
 
-    private function estimateUnitCost(Unit $unit, Order $order): float
-    {
-        return 1000 + ($unit->id * 100);
-    }
-
-    /**
-     * History score (weight 15)
-     */
+    
     private function historyScore(Unit $unit): float
     {
         $totalJobs = ProductionJob::where('unit_id', $unit->id)
@@ -168,15 +213,13 @@ class AllocationService
             ->where('status', 'delivered')
             ->whereNotNull('completed_at')
             ->whereNotNull('deadline')
-            ->whereColumn('completed_at', '<=', 'deadline')
+            ->whereRaw('DATE(completed_at) <= deadline')
             ->count();
 
         return ($onTimeJobs / $totalJobs) * 100;
     }
 
-    /**
-     * Quality score (weight 10)
-     */
+    
     private function qualityScore(Unit $unit): float
     {
         $totalJobs = ProductionJob::where('unit_id', $unit->id)
@@ -192,7 +235,6 @@ class AllocationService
             ->where('rework_count', '>', 0)
             ->count();
 
-        $reworkRate = $reworkedJobs / $totalJobs;
-        return (1 - $reworkRate) * 100;
+        return (1 - ($reworkedJobs / $totalJobs)) * 100;
     }
 }

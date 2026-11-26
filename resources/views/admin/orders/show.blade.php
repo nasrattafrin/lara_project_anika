@@ -77,4 +77,30 @@
             </div>
         </div>
     @endif
+
+    @if($order->jobs->count() > 0)
+        <div class="row">
+            <div class="col-md-12">
+                <div class="x_panel">
+                    <div class="x_title"><h2>Production Job</h2><div class="clearfix"></div></div>
+                    <div class="x_content">
+                        <table class="table table-striped">
+                            <thead><tr><th>Job #</th><th>Unit</th><th>Qty</th><th>Status</th><th></th></tr></thead>
+                            <tbody>
+                                @foreach($order->jobs as $job)
+                                    <tr>
+                                        <td>{{ $job->job_number }}</td>
+                                        <td>{{ $job->unit->name ?? '—' }}</td>
+                                        <td>{{ number_format($job->quantity) }}</td>
+                                        <td><span class="label label-primary">{{ ucfirst($job->status) }}</span></td>
+                                        <td><a href="{{ route('jobs.show', $job->id) }}" class="btn btn-xs btn-primary">Open</a></td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    @endif
 @endsection

@@ -6,10 +6,12 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use App\Models\Concerns\BelongsToTenant;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Unit extends Model
 {
-    use HasFactory, SoftDeletes;
+    use HasFactory, SoftDeletes,BelongsToTenant;
 
     protected $fillable = [
         'tenant_id',
@@ -23,6 +25,10 @@ class Unit extends Model
     public function tenant(): BelongsTo
     {
         return $this->belongsTo(Tenant::class);
+    }
+        public function machines(): HasMany
+    {
+        return $this->hasMany(Machine::class);
     }
 
     // ── Helpers ──

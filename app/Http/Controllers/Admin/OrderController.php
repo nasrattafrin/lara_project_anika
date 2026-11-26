@@ -22,8 +22,7 @@ class OrderController extends Controller
         if ($order->tenant_id !== auth()->user()->tenant_id) {
             abort(403);
         }
-
-        $order->load(['items', 'allocations.unit']);
+        $order->load(['items', 'allocations.unit', 'jobs.unit']);
 
         return view('admin.orders.show', compact('order'));
     }
@@ -40,6 +39,7 @@ class OrderController extends Controller
             'quantity' => 'required|integer|min:1',
             'deadline' => 'required|date|after_or_equal:today',
             'notes' => 'nullable|string',
+            'process_type' => 'required|in:offset,digital,large_format,screen',
         ]);
 
         $order = Order::create([
@@ -57,6 +57,7 @@ class OrderController extends Controller
             'quantity' => $validated['quantity'],
             'unit_price' => 0,
             'total_price' => 0,
+            'process_type' => $validated['process_type'],
         ]);
 
         return redirect()->route('allocations.scorecard', $order)
